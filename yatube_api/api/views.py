@@ -1,8 +1,8 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import exceptions, filters, permissions, viewsets
+from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 
-from posts.models import Follow, Group, Post, User
+from posts.models import Group, Post
 from .permissions import IsOwnerOrReadOnly
 from .serializers import (CommentSerializer,
                           FollowSerializer,
@@ -15,18 +15,18 @@ class CommentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,
                           IsOwnerOrReadOnly]
 
-    def check_post(self):
+    def get_post(self):
         post_id = self.kwargs.get("post_id")
 
         return get_object_or_404(Post, pk=post_id)
 
     def get_queryset(self):
-        post = self.check_post()
+        post = self.get_post()
 
         return post.comments.all()
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, post=self.check_post())
+        serializer.save(author=self.request.user, post=self.get_post())
 
 
 class FollowViewSet(viewsets.ModelViewSet):
@@ -43,21 +43,6 @@ class FollowViewSet(viewsets.ModelViewSet):
         return user.follower.all()
 
     def perform_create(self, serializer):
-        following = get_object_or_404(
-            User,
-            username=serializer.initial_data['following']
-        )
-
-        if following == self.request.user:
-            raise exceptions.ValidationError(
-                'Подписка на самого себя запрещена.'
-            )
-        if Follow.objects.filter(
-            user=self.request.user,
-            following=following
-        ).exists():
-            raise exceptions.ValidationError('Подписка уже оформлена.')
-
         serializer.save(user=self.request.user)
 
 
